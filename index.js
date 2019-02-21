@@ -32,8 +32,7 @@ const fs = require("fs");
         i++;
       }
     } catch(e) {
-      console.log(e);
-      resume(i, j);
+      console.log(`${i} ${j}`);
       throw new Error(e);
     } finally {
       await driver.quit();
@@ -101,7 +100,8 @@ const fs = require("fs");
     let maxTempIndex = -1;
 
     const tableHeaders = await detailsTable.findElements(By.css("th"));
-    const headerTexts = await Promise.all(tableHeaders.map(async (x) => x.getText()));
+    const headerTexts = (await Promise.all(tableHeaders.map(async (x) => x.getText()))).filter(x => x.length > 0);
+
     for (let i = 0; i < headerTexts.length; i++) {
       switch (headerTexts[i]) {
         case "MONTH":
@@ -128,10 +128,6 @@ const fs = require("fs");
           throw new Error("Unknown header: " + headerTexts[i]);
       }
     }
-
-    // const re = /([^\)]+\))/g;
-    // const headLine = lines[0];
-    // const headFields = headLine.match(re).map(x => x.trim());
 
     const tableText = await detailsTable.getText();
     const lines = tableText.split("\n");
