@@ -1,31 +1,79 @@
 const {Builder, By, Key, until} = require('selenium-webdriver');
 const fs = require("fs");
 
-  const url = "https://www.ncdc.noaa.gov/cdo-web/datatools/normals";
-  const timeoutInterval = 10000;
-  let driver = null;
+const logPath = "log.txt";
+const url = "https://www.ncdc.noaa.gov/cdo-web/datatools/normals";
+const timeoutInterval = 10000;
+let driver = null;
 
-  async function run() {
-    driver = await new Builder().forBrowser('chrome').build();
-    await resume(0, 0);
+async function init() {
+
+}
+
+class LogReader {
+  async readFile(path) {
+    return new Promise((resolve, reject) => {
+      fs.readFile(path, 'utf8', (err, contents) => {
+        if (err != null) {
+          reject(err);
+        }
+        resolve(contents);
+      });
+    });
+  }
+  
+  async readLog() {
+    return await this.readFile(logPath);
+  }
+  
+  parseLog(log) {
+    const data = [];
+    const lines = log.split("\n");
+    for (let line of lines) {
+      const fields = line.split("\t");
+      if (fields.length !== 6) {
+        continue;
+      }
+      data.push({
+        location: fields[0].trim(),
+        station: fields[1].trim(),
+        precip: (fields[2].length > 0) ? fields[2].split(",").map(x => parseFloat(x)) : null,
+        minTemp: (fields[3].length > 0) ? fields[3].split(",").map(x => parseFloat(x)) : null,
+        avgTemp: (fields[4].length > 0) ? fields[4].split(",").map(x => parseFloat(x)) : null,
+        maxTemp: (fields[5].length > 0) ? fields[5].split(",").map(x => parseFloat(x)) : null,
+      });
+    }
+    return data;
+  }
+}
+
+class ClimateFetcher {
+
+  constructor() {
+    console.log("hi");
   }
 
-  async function resume(locationIndex, stationIndex) {
+  async run() {
+    driver = await new Builder().forBrowser('chrome').build();
+    await this.resume(0, 0);
+  }
+
+  async resume(locationIndex, stationIndex) {
     let i = locationIndex;
     let j = stationIndex;
     try {
       await driver.get(url);
-      const loadingOverlay = await getLoadingOverlay();
+      const loadingOverlay = await this.getLoadingOverlay();
       await driver.wait(until.elementIsNotVisible(loadingOverlay), timeoutInterval);
-      const locations = await getLocationOptions();
+      const locations = await this.getLocationOptions();
       while (i < locations.length) {
         const location = locations[i];
-        const stations = await getStationOptions(location, loadingOverlay);
+        const stations = await this.getStationOptions(location, loadingOverlay);
         while (j < stations.length) {
           const station = stations[j];
-          const detailsTable = await getDetailsTable(station, loadingOverlay);
-          const stationData = await parseStationData(location, station, detailsTable);
-          await logStationData(stationData);
+          const detailsTable = await this.getDetailsTable(station, loadingOverlay);
+          const stationData = await this.parseStationData(location, station, detailsTable);
+          await this.logStationData(stationData);
           j++;
         }
         j = 0;
@@ -39,37 +87,37 @@ const fs = require("fs");
     }
   }
 
-  async function log(path, data) {
+  async log(data) {
     return new Promise((resolve, reject) => {
-      fs.appendFile(path, data, 'utf8', () => {
+      fs.appendFile(logPath, data, 'utf8', () => {
         resolve();
       });
     });
   }
 
 
-  async function logStationData(stationData) {
+  async logStationData(stationData) {
     const location = stationData.location;
     const station = stationData.station;
     const precipField = (stationData.precip) ? stationData.precip.join(",") : "";
     const minTempField = (stationData.minTemp) ? stationData.minTemp.join(",") : "";
     const avgTempField = (stationData.avgTemp) ? stationData.avgTemp.join(",") : "";
     const maxTempField = (stationData.maxTemp) ? stationData.maxTemp.join(",") : "";
-    await log("log.txt", `${location}\t${station}\t${precipField}\t${minTempField}\t${avgTempField}\t${maxTempField}\n`);
+    await this.log(`${location}\t${station}\t${precipField}\t${minTempField}\t${avgTempField}\t${maxTempField}\n`);
   }
 
-  async function getLoadingOverlay() {
+  async getLoadingOverlay() {
     const loadingOverlay = await driver.findElement(By.css(".loadingOverlay"));
     return loadingOverlay;
   }
 
-  async function getLocationOptions() {
+  async getLocationOptions() {
     const locationSelect = await driver.findElement(By.css(".locationSelect"));
     const locationOptions = await locationSelect.findElements(By.css("option"));
     return locationOptions;
   }
 
-  async function getStationOptions(locationOption, loadingOverlay) {
+  async getStationOptions(locationOption, loadingOverlay) {
     await locationOption.click();
     await driver.wait(until.elementIsNotVisible(loadingOverlay), timeoutInterval);
     const stationSelect = await driver.findElement(By.css(".stationSelect"));
@@ -77,14 +125,14 @@ const fs = require("fs");
     return stationOptions;
   }
 
-  async function getDetailsTable(stationOption, loadingOverlay) {
+  async getDetailsTable(stationOption, loadingOverlay) {
     await stationOption.click();
     await driver.wait(until.elementIsNotVisible(loadingOverlay), timeoutInterval);
     const detailsTable = await driver.findElement(By.css(".detailsTable"));
     return detailsTable;
   }
 
-  async function parseStationData(locationOption, stationOption, detailsTable) {
+  async parseStationData(locationOption, stationOption, detailsTable) {
     const data = {
       location: await locationOption.getText(),
       station: await stationOption.getText(),
@@ -154,5 +202,6 @@ const fs = require("fs");
 
     return data;
   }
+}
 
-  run();
+  init();
