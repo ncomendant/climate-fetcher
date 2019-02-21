@@ -7,7 +7,86 @@ const timeoutInterval = 10000;
 let driver = null;
 
 async function init() {
+  const reader = new LogReader();
+  const log = await reader.readLog();
+  const data = reader.parseLog(log);
 
+  const summaries = summarize(data);
+  const filteredSummaries = filterSummaries(summaries, {
+    minLow: 40,
+    minHigh: 60,
+    maxHigh: 100,
+  });
+
+  for (let summary of filteredSummaries) {
+    const minHighString = (summary.minHigh != null) ? summary.minHigh.toFixed(0) : "N/A";
+    const maxHighString = (summary.maxHigh != null) ? summary.maxHigh.toFixed(0) : "N/A";
+    const minLowString = (summary.minLow != null) ? summary.minLow.toFixed(0) : "N/A";
+    console.log(`${minHighString}-${maxHighString}\t${minLowString}\t${summary.location}\t${summary.station}`);
+  }
+  console.log(`\nResults found: ${filteredSummaries.length}`);
+}
+
+function filterSummaries(summaries, options) {
+  return summaries.filter((x) => {
+    if (options.minLow != null && x.minLow < options.minLow) {
+      return false;
+    }
+    if (options.minHigh != null && x.minHigh < options.minHigh) {
+      return false;
+    }
+    if (options.maxHigh != null && x.maxHigh > options.maxHigh) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function summarize(data) {
+  const result = [];
+  for (let item of data) {
+    result.push({
+      location: item.location,
+      station: item.station,
+      precip: avg(item.precip),
+      minLow: min(item.minTemp),
+      maxLow: max(item.minTemp),
+      minHigh: min(item.maxTemp),
+      maxHigh: max(item.maxTemp),
+    });
+  }
+  return result;
+}
+
+function avg(arr) {
+  if (arr == null || arr.length === 0) return null;
+  let sum = 0;
+  for (let item of arr) {
+    sum += item;
+  }
+  return sum/arr.length;
+}
+
+function max(arr) {
+  if (arr == null || arr.length === 0) return null;
+  let result = arr[0];
+  for (let item of arr) {
+    if (item > result) {
+      result = item;
+    }
+  }
+  return result;
+}
+
+function min(arr) {
+  if (arr == null || arr.length === 0) return null;
+  let result = arr[0];
+  for (let item of arr) {
+    if (item < result) {
+      result = item;
+    }
+  }
+  return result;
 }
 
 class LogReader {
